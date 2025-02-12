@@ -1,0 +1,90 @@
+1. Install Dependencies
+python
+Copy code
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+import numpy as np
+import pandas as pd
+import cv2
+import os
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+2. Load and Preprocess Data
+Assuming you have a dataset with images in folders named after food categories:
+
+python
+Copy code
+IMAGE_SIZE = (224, 224)
+BATCH_SIZE = 32
+DATASET_PATH = "path_to_food_dataset"
+
+datagen = ImageDataGenerator(rescale=1./255, validation_split=0.2)
+
+train_generator = datagen.flow_from_directory(
+    DATASET_PATH,
+    target_size=IMAGE_SIZE,
+    batch_size=BATCH_SIZE,
+    class_mode='categorical',
+    subset='training'
+)
+
+val_generator = datagen.flow_from_directory(
+    DATASET_PATH,
+    target_size=IMAGE_SIZE,
+    batch_size=BATCH_SIZE,
+    class_mode='categorical',
+    subset='validation'
+)
+3. Define CNN Model
+python
+Copy code
+model = keras.Sequential([
+    layers.Conv2D(32, (3,3), activation='relu', input_shape=(224, 224, 3)),
+    layers.MaxPooling2D(2,2),
+
+    layers.Conv2D(64, (3,3), activation='relu'),
+    layers.MaxPooling2D(2,2),
+
+    layers.Conv2D(128, (3,3), activation='relu'),
+    layers.MaxPooling2D(2,2),
+
+    layers.Flatten(),
+    layers.Dense(256, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(len(train_generator.class_indices), activation='softmax')
+])
+
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+4. Train the Model
+python
+Copy code
+EPOCHS = 10
+
+model.fit(
+    train_generator,
+    validation_data=val_generator,
+    epochs=EPOCHS
+)
+5. Predict Food Items & Calories
+Create a dictionary mapping food categories to calorie values:
+
+python
+Copy code
+calorie_dict = {
+    "apple": 52, "banana": 89, "burger": 295, "pizza": 266,  # Example calorie values
+    "salad": 33, "sushi": 150, "chocolate_cake": 400
+}
+
+def predict_food(image_path):
+    img = cv2.imread(image_path)
+    img = cv2.resize(img, IMAGE_SIZE)
+    img = np.expand_dims(img, axis=0) / 255.0
+    
+    prediction = model.predict(img)
+    class_index = np.argmax(prediction)
+    food_item = list(train_generator.class_indices.keys())[class_index]
+    
+    calories = calorie_dict.get(food_item, "Unknown")
+    
+    return food_item, calories
